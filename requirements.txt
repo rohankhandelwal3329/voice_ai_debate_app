@@ -1,6 +1,0 @@
-# For development tools only (React app uses package.json for dependencies)
-# If you deploy or use server-side scripts, add Python packages here.
-
-# Example:
-# flask==2.3.2
-# requests==2.31.0
