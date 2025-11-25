@@ -1,31 +1,47 @@
-# Assignment Authenticity Checker
+# CETLOE's Learning Integrity Checker
 
-A voice-powered tool that verifies whether students truly understand the assignments they submit. Students upload their work, answer three voice questions from an AI coach (powered by Gemini), and receive an integrity score.
+A voice-powered tool that verifies whether students truly understand the assignments they submit. Students upload their work, answer three voice questions from an AI coach, and receive an integrity score.
+
+## Features
+
+- **Dual AI Models**: Choose between Gemini AI (custom) or ElevenLabs Conversational AI
+- **File Upload**: Supports PDF, DOCX, PPTX, and TXT (up to 8 MB)
+- **Voice Conversation**: Real-time speech recognition and AI voice responses
+- **Live Transcript**: See the conversation as it happens
+- **Integrity Scoring**: 30-100 score based on how well students explain their own work
+- **Modern UI**: Clean, minimal design with visual orb feedback
 
 ## Architecture
 
 ```
-┌─────────────────────┐         ┌─────────────────────┐
-│   React Frontend    │  HTTP   │   FastAPI Backend   │
-│  (Vite + Browser    │◄───────►│  (Python + Gemini)  │
-│   Speech API)       │         │                     │
-└─────────────────────┘         └─────────────────────┘
-         │                               │
-         │ Web Speech API                │ Google Generative AI
-         │ (recognition)                 │ (questions + scoring)
-         │                               │
-         │ Audio playback                │ gTTS
-         │ (base64 MP3)                  │ (text-to-speech)
+┌─────────────────────────┐         ┌─────────────────────────┐
+│    React Frontend       │  HTTP   │    FastAPI Backend      │
+│  (Vite + Web Speech)    │◄───────►│  (Python + Gemini)      │
+└─────────────────────────┘         └─────────────────────────┘
+         │                                   │
+         ├── Web Speech API                  ├── Google Generative AI
+         │   (voice recognition)             │   (questions + scoring)
+         │                                   │
+         ├── ElevenLabs SDK                  └── gTTS (text-to-speech)
+         │   (conversational AI)
+         │
+         └── Audio playback (base64 MP3)
 ```
 
-## Features
+## AI Model Options
 
-- **File upload**: Supports PDF, DOCX, PPTX, and TXT (up to 8 MB)
-- **Voice conversation**: Browser-based speech recognition + server-side TTS
-- **Gemini-powered questions**: AI generates adaptive questions based on the assignment content
-- **Live transcript**: Real-time display of the conversation
-- **Integrity scoring**: 0-100 score based on concept coverage, depth, and authenticity signals
-- **Fallback to text**: Students can type answers if voice doesn't work
+### Gemini AI (Default)
+- Custom implementation using Google's Gemini API
+- Backend handles conversation logic and scoring
+- Uses Web Speech API for voice input
+- gTTS for voice output
+
+### ElevenLabs Conversational AI
+- Uses ElevenLabs' conversational AI agent
+- Real-time voice-to-voice conversation
+- Custom orb visualization
+- Live transcription
+- Requires ElevenLabs agent setup (see below)
 
 ## Setup
 
@@ -55,27 +71,50 @@ notepad .env
 ### 2. Frontend (React)
 
 ```bash
-# From project root
-npm install
+cd frontend
 
-# Create .env file for API URL (optional, defaults to localhost:8000)
-echo VITE_API_URL=http://localhost:8000 > .env
+# Install dependencies
+npm install
 ```
+
+### 3. ElevenLabs Setup (Optional)
+
+If you want to use the ElevenLabs model:
+
+1. Create an account at https://elevenlabs.io
+2. Go to **Conversational AI** → **Agents** → Create new agent
+3. Copy the **Agent ID** and update it in `frontend/src/components/ElevenLabsPanel.jsx`
+4. In agent settings → **Security** tab:
+   - Enable **First message** override
+   - Enable **System prompt** override
+5. Set a default system prompt (will be overridden by the app):
+   ```
+   You are an AI coach verifying a student understands their submitted assignment.
+   Ask 3 short, specific questions about their work, then give an integrity score.
+   ```
 
 ## Running Locally
 
-### Start the backend
+### Option 1: Using run.py (Recommended)
 
+```bash
+python run.py
+```
+
+This starts both backend and frontend automatically.
+
+### Option 2: Manual Start
+
+**Terminal 1 - Backend:**
 ```bash
 cd backend
 venv\Scripts\activate  # Windows
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Start the frontend
-
+**Terminal 2 - Frontend:**
 ```bash
-# From project root (new terminal)
+cd frontend
 npm run dev
 ```
 
@@ -84,28 +123,44 @@ Open http://localhost:5173 in Chrome (best speech recognition support).
 ## Usage Flow
 
 1. **Upload**: Drag or select a PDF/DOCX/PPTX/TXT file
-2. **Listen**: AI coach greets you and asks the first question (plays audio)
-3. **Speak**: Click the mic button and answer verbally (or switch to text input)
-4. **Repeat**: Answer two more questions
-5. **Review**: See your integrity score and feedback
+2. **Select Model**: Choose Gemini AI or ElevenLabs
+3. **Start Q&A**: Click "Start Q&A" to begin the voice conversation
+4. **Answer Questions**: The AI asks 3 questions about your assignment
+5. **Get Results**: See your integrity score and review
 
-## API Endpoints
+## Project Structure
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/upload` | POST | Upload assignment file, returns first question |
-| `/api/answer` | POST | Submit answer, returns next question or final review |
-| `/api/session/{id}/transcript` | GET | Get conversation history |
-| `/api/health` | GET | Health check |
-
-## Deployment
-
-### Backend
-
-Deploy the FastAPI backend to any Python hosting service:
-- **Railway**: `railway up`
-- **Render**: Connect repo, set `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- **Fly.io**: `fly launch`
+```
+├── backend/
+│   ├── main.py              # FastAPI app + endpoints
+│   ├── config.py            # Environment settings
+│   ├── file_parser.py       # PDF/DOCX/PPTX extraction
+│   ├── gemini_service.py    # Gemini AI integration
+│   ├── tts_service.py       # Text-to-speech (gTTS)
+│   ├── requirements.txt     # Python dependencies
+│   └── env.example          # Environment template
+│
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx          # Main React app
+│   │   ├── styles.css       # Styling
+│   │   ├── api.js           # API client
+│   │   ├── components/
+│   │   │   ├── UploadPanel.jsx      # File upload + model selection
+│   │   │   ├── ReadyPanel.jsx       # Pre-conversation screen
+│   │   │   ├── InterviewPanel.jsx   # Gemini Q&A interface
+│   │   │   ├── ElevenLabsPanel.jsx  # ElevenLabs Q&A interface
+│   │   │   ├── ResultsPanel.jsx     # Score display
+│   │   │   ├── Orb.jsx              # Visual orb component
+│   │   │   └── ...
+│   │   └── hooks/
+│   │       ├── useSpeechRecognition.js  # Voice input hook
+│   │       └── useAudioPlayer.js        # Audio playback hook
+│   ├── package.json         # Node dependencies
+│   └── vite.config.js       # Vite configuration
+│
+└── run.py                   # Start both servers
+```
 
 Set the `GEMINI_API_KEY` environment variable in your hosting dashboard.
 
@@ -114,42 +169,32 @@ Set the `GEMINI_API_KEY` environment variable in your hosting dashboard.
 Build and deploy the static frontend:
 
 ```bash
+cd frontend
 npm run build
-```
-
-Deploy the `dist/` folder to:
-- Vercel
-- Netlify
-- GitHub Pages
-- Any static hosting
-
-Set `VITE_API_URL` to your deployed backend URL before building.
-
-## Project Structure
-
-```
-├── backend/
-│   ├── main.py           # FastAPI app + endpoints
-│   ├── config.py         # Environment settings
-│   ├── file_parser.py    # PDF/DOCX/PPTX extraction
-│   ├── gemini_service.py # Gemini AI integration
-│   ├── tts_service.py    # Text-to-speech (gTTS)
-│   ├── requirements.txt  # Python dependencies
-│   └── env.example       # Environment template
-├── src/
-│   ├── App.jsx           # React app with voice UI
-│   ├── styles.css        # Dark theme styles
-│   └── index.jsx         # Entry point
-├── package.json          # Node dependencies
-└── vite.config.js        # Vite configuration
 ```
 
 ## Browser Support
 
-- **Chrome**: Full support (Web Speech API)
+- **Chrome**: Full support (Web Speech API + ElevenLabs)
 - **Edge**: Full support
-- **Firefox**: Text input only (no speech recognition)
+- **Firefox**: ElevenLabs only (no Web Speech API)
 - **Safari**: Partial support
+
+## Troubleshooting
+
+### ElevenLabs not connecting
+- Check that overrides are enabled in agent Security settings
+- Verify the Agent ID is correct
+- Try in an incognito window to clear cache
+
+### Speech recognition stops working
+- Refresh the page
+- Check microphone permissions
+- Use Chrome for best support
+
+### Score not showing correctly
+- The AI should say "Your integrity score is X out of one hundred"
+- Check console for "Extracting score from:" logs
 
 ## License
 
