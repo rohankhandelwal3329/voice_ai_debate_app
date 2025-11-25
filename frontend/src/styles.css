@@ -931,6 +931,17 @@ body {
   animation: blink 1.5s infinite;
 }
 
+.complete-badge {
+  color: #22c55e;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.orb-hint.success {
+  color: #22c55e;
+  font-weight: 500;
+}
+
 .orb-hint {
   margin-top: 12px;
   color: rgba(255, 255, 255, 0.5);

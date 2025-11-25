@@ -138,14 +138,15 @@ export default function App() {
 
   const handleElevenLabsComplete = useCallback((result) => {
     // ElevenLabs conversation completed
-    if (result) {
-      setAnalysis({
-        finalScore: result.score || 75,
-        review: result.review || "Conversation completed.",
-        observations: result.observations || [],
-        confidenceTag: result.score >= 85 ? "Likely original" : result.score >= 65 ? "Probably student-made" : "Needs verification",
-      });
-    }
+    console.log("ElevenLabs complete result:", result);
+    const score = result?.score || 75;
+    
+    setAnalysis({
+      finalScore: score,
+      review: result?.review || "Conversation completed.",
+      observations: result?.observations || [],
+      confidenceTag: score >= 85 ? "Likely original" : score >= 65 ? "Probably student-made" : "Needs verification",
+    });
     setStep("results");
   }, []);
 
