@@ -44,47 +44,70 @@ SCORING GUIDELINES (be precise, use ANY number from 30-100):
 USE PRECISE SCORES like 97, 88, 73, 82, 91, 100 - NOT just multiples of 5!
 If a student demonstrates excellent understanding, give them 98, 99, or 100.
 
+CRITICAL: Always include the COMPLETE text in your response. Never truncate with "..." """
+
+# JSON format instructions - always appended to ensure proper parsing
+JSON_FORMAT_INSTRUCTIONS = """
 RESPONSE FORMAT - ALWAYS use this exact JSON structure:
-For questions: {"type": "question", "number": 1, "text": "Your full question here"}
+For first question: {"type": "question", "number": 1, "text": "Hi [name if known]! I've read your assignment about [topic]. [Your greeting showing you read it]. Now, [your first question]?"}
+For follow-up questions: {"type": "question", "number": 2, "text": "Your follow-up question here"}
 For review: {"type": "review", "score": 87, "review": "Your review here.", "observations": ["point 1", "point 2"]}
 
-CRITICAL: Always include the COMPLETE text in your response. Never truncate with "..." """
+IMPORTANT: The "text" field must contain the COMPLETE message you want to say. For the first question, include a friendly greeting AND the question in the same text field.
+
+Return ONLY valid JSON, nothing else."""
 
 
 class GeminiService:
-    def __init__(self):
+    def __init__(self, api_key: str = None):
         settings = get_settings()
-        if not settings.gemini_api_key:
-            raise ValueError("GEMINI_API_KEY not set in environment")
-        genai.configure(api_key=settings.gemini_api_key)
+        key = api_key or settings.gemini_api_key
+        if not key:
+            raise ValueError("GEMINI_API_KEY not set. Please add it in Settings or .env file.")
+        genai.configure(api_key=key)
         self.model = genai.GenerativeModel("gemini-2.5-flash")
 
-    def start_session(self, assignment_text: str) -> dict:
-        prompt = f"""{SYSTEM_PROMPT}
+    def start_session(self, assignment_text: str, custom_prompt: str = None, num_questions: int = 3) -> dict:
+        system_prompt = custom_prompt or SYSTEM_PROMPT
+        # Replace the number of questions in the prompt if custom
+        if num_questions != 3:
+            system_prompt = system_prompt.replace("AFTER 3 ANSWERS:", f"AFTER {num_questions} ANSWERS:")
+            system_prompt = system_prompt.replace("answered all three questions", f"answered all {num_questions} questions")
+        
+        prompt = f"""{system_prompt}
+
+{JSON_FORMAT_INSTRUCTIONS}
 
 Here is the student's assignment:
 ---
-{assignment_text[:5000]}
+{assignment_text[:10000]}
 ---
 
-Start with a brief friendly greeting that shows you read their work, then ask your FIRST question. Pick something interesting or important from their assignment to ask about.
+Your response must include BOTH a greeting AND your first question in the "text" field. Example format:
+"Hi there! I've read your assignment about [specific topic from their work]. It's interesting how you approached [something specific]. My first question is: [your question about something specific from their assignment]?"
 
-Return ONLY valid JSON, nothing else."""
+Make sure the greeting mentions something specific from their assignment to show you actually read it."""
 
         response = self.model.generate_content(prompt)
         return self._parse_response(response.text)
 
-    def process_answer(self, assignment_text: str, conversation_history: list, answer: str, question_number: int) -> dict:
+    def process_answer(self, assignment_text: str, conversation_history: list, answer: str, question_number: int, custom_prompt: str = None, num_questions: int = 3) -> dict:
+        system_prompt = custom_prompt or SYSTEM_PROMPT
+        # Replace the number of questions in the prompt if custom
+        if num_questions != 3:
+            system_prompt = system_prompt.replace("AFTER 3 ANSWERS:", f"AFTER {num_questions} ANSWERS:")
+            system_prompt = system_prompt.replace("answered all three questions", f"answered all {num_questions} questions")
+        
         history_text = "\n".join([
             f"{'Coach' if msg['role'] == 'ai' else 'Student'}: {msg['text']}"
             for msg in conversation_history[-6:]
         ])
 
-        if question_number < 3:
+        if question_number < num_questions:
             next_q = question_number + 1
             instruction = f"Now ask question {next_q}. Pick something different from what you already asked about. Reference a specific part of their assignment."
         else:
-            instruction = """The student has answered all three questions. Give a brief encouraging review (2-3 sentences) and an ACCURATE integrity score.
+            instruction = f"""The student has answered all {num_questions} questions. Give a brief encouraging review (2-3 sentences) and an ACCURATE integrity score.
 
 Use a PRECISE score (like 97, 88, 73, 91, 100) - NOT just multiples of 5!
 - If they answered excellently with clear understanding, give 95-100
@@ -92,7 +115,9 @@ Use a PRECISE score (like 97, 88, 73, 91, 100) - NOT just multiples of 5!
 - If adequate but some gaps, give 75-84
 - Score lower only if they struggled significantly"""
 
-        prompt = f"""{SYSTEM_PROMPT}
+        prompt = f"""{system_prompt}
+
+{JSON_FORMAT_INSTRUCTIONS}
 
 Assignment:
 ---
@@ -104,16 +129,18 @@ Conversation so far:
 
 Student's latest answer: "{answer}"
 
-{instruction}
-
-Return ONLY valid JSON, nothing else."""
+{instruction}"""
 
         response = self.model.generate_content(prompt)
         return self._parse_response(response.text)
 
     def _parse_response(self, text: str) -> dict:
         # Clean the response text
+        original_text = text
         text = text.strip()
+        
+        print(f"[Gemini] Raw response length: {len(text)}")
+        print(f"[Gemini] Raw response preview: {text[:200]}...")
         
         # Remove markdown code blocks if present
         if text.startswith("```"):
@@ -124,11 +151,13 @@ Return ONLY valid JSON, nothing else."""
         try:
             result = json.loads(text)
             if isinstance(result, dict) and "text" in result:
+                print(f"[Gemini] Parsed JSON with text: {result['text'][:100]}...")
                 return result
             if isinstance(result, dict) and "review" in result:
+                print(f"[Gemini] Parsed JSON with review")
                 return result
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            print(f"[Gemini] JSON parse error: {e}")
         
         # Try to find JSON object with balanced braces
         brace_count = 0
@@ -145,6 +174,7 @@ Return ONLY valid JSON, nothing else."""
                     try:
                         result = json.loads(json_str)
                         if isinstance(result, dict):
+                            print(f"[Gemini] Found embedded JSON")
                             return result
                     except json.JSONDecodeError:
                         pass
@@ -157,11 +187,25 @@ Return ONLY valid JSON, nothing else."""
             extracted_text = text_match.group(1)
             # Unescape JSON string
             extracted_text = extracted_text.replace('\\"', '"').replace('\\n', '\n')
+            print(f"[Gemini] Extracted text from pattern: {extracted_text[:100]}...")
             return {"type": "question", "number": 1, "text": extracted_text}
         
-        # If all else fails, just use the raw text
-        clean_text = re.sub(r'\{[^}]*$', '', text).strip()  # Remove incomplete JSON
-        clean_text = re.sub(r'^[^a-zA-Z]*', '', clean_text)  # Remove leading non-letters
-        if not clean_text:
-            clean_text = "I'm having trouble formulating my question. Could you tell me about your assignment?"
+        # Try to extract review pattern
+        review_match = re.search(r'"review"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', text)
+        if review_match:
+            extracted_review = review_match.group(1).replace('\\"', '"').replace('\\n', '\n')
+            score_match = re.search(r'"score"\s*:\s*(\d+)', text)
+            score = int(score_match.group(1)) if score_match else 75
+            print(f"[Gemini] Extracted review from pattern")
+            return {"type": "review", "score": score, "review": extracted_review, "observations": []}
+        
+        # If all else fails, use the raw text as a question
+        # Clean up any JSON artifacts
+        clean_text = re.sub(r'[\{\}"\[\]]', '', text)  # Remove JSON chars
+        clean_text = re.sub(r'\s+', ' ', clean_text).strip()  # Normalize whitespace
+        
+        if len(clean_text) < 10:
+            clean_text = "Hello! I've reviewed your assignment. Could you start by telling me about the main topic or goal of your work?"
+        
+        print(f"[Gemini] Using fallback text: {clean_text[:100]}...")
         return {"type": "question", "number": 1, "text": clean_text}

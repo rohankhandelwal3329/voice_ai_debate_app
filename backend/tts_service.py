@@ -20,14 +20,17 @@ ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"  # Bella - friendly and natural
 ELEVENLABS_MODEL = "eleven_turbo_v2_5"
 
 
-def text_to_speech_base64(text: str, lang: str = "en") -> str:
+def text_to_speech_base64(text: str, lang: str = "en", elevenlabs_api_key: str = None) -> str:
     """Convert text to speech using ElevenLabs and return as base64-encoded MP3."""
     settings = get_settings()
     
+    # Use provided key or fall back to settings
+    api_key = elevenlabs_api_key or settings.elevenlabs_api_key
+    
     # Try ElevenLabs first if API key is available
-    if settings.elevenlabs_api_key:
+    if api_key:
         try:
-            return _elevenlabs_tts(text, settings.elevenlabs_api_key)
+            return _elevenlabs_tts(text, api_key)
         except Exception as e:
             print(f"ElevenLabs TTS failed, falling back to gTTS: {e}")
     

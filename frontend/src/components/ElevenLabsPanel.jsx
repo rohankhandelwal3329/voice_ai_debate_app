@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Orb from "./Orb";
 
+// ElevenLabs Agent ID - get from https://elevenlabs.io/app/conversational-ai
+const ELEVENLABS_AGENT_ID = "agent_9501kashe10zf1g8bdzz96aef9z6";
+
 // Helper to convert spoken numbers to digits
 const wordToNumber = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
@@ -74,7 +77,7 @@ function extractScoreFromText(text) {
   return null;
 }
 
-export function ElevenLabsPanel({ assignmentText, fileName, agentId, onComplete, onRestart }) {
+export function ElevenLabsPanel({ assignmentText, fileName, onComplete, onRestart }) {
   const [conversationState, setConversationState] = useState("idle");
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState("");
@@ -122,12 +125,6 @@ export function ElevenLabsPanel({ assignmentText, fileName, agentId, onComplete,
   const startConversation = useCallback(async () => {
     if (isStartingRef.current || conversationRef.current) {
       console.log("Already starting or connected");
-      return;
-    }
-    
-    // Check if agent ID is configured
-    if (!agentId) {
-      setError("ElevenLabs Agent ID not configured. Please add ELEVENLABS_AGENT_ID to your .env file.");
       return;
     }
     
@@ -193,7 +190,7 @@ IMPORTANT:
       console.log("=== END DEBUG ===");
 
       const conversation = await Conversation.startSession({
-        agentId: agentId,
+        agentId: ELEVENLABS_AGENT_ID,
         overrides: {
           agent: {
             prompt: {

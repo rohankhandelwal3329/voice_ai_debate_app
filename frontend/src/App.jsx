@@ -8,6 +8,8 @@ import { ReadyPanel } from "./components/ReadyPanel";
 import { GeminiPanel } from "./components/GeminiPanel";
 import { ResultsPanel } from "./components/ResultsPanel";
 import { ElevenLabsPanel } from "./components/ElevenLabsPanel";
+import { SettingsModal, loadSettings, hasConfiguredKeys } from "./components/SettingsModal";
+import { SettingsIcon } from "./components/Icons";
 
 export default function App() {
   const [step, setStep] = useState("upload");
@@ -25,10 +27,25 @@ export default function App() {
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [currentQuestionAudio, setCurrentQuestionAudio] = useState("");
   const [assignmentText, setAssignmentText] = useState("");
-  const [elevenlabsAgentId, setElevenlabsAgentId] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [keysConfigured, setKeysConfigured] = useState(hasConfiguredKeys());
 
   const speech = useSpeechRecognition();
   const audio = useAudioPlayer();
+
+  // Show settings modal on first use if no API keys are configured
+  useEffect(() => {
+    if (!hasConfiguredKeys()) {
+      setShowSettings(true);
+    }
+  }, []);
+
+  // Check if keys are configured when settings modal closes
+  useEffect(() => {
+    if (!showSettings) {
+      setKeysConfigured(hasConfiguredKeys());
+    }
+  }, [showSettings]);
 
   const handleModelChange = useCallback((model) => {
     setSelectedModel(model);
@@ -41,14 +58,10 @@ export default function App() {
     setFileName(file.name);
 
     try {
-      const data = await uploadAssignment(file);
+      const settings = loadSettings();
+      const data = await uploadAssignment(file, settings);
       setSessionId(data.session_id);
       setAssignmentText(data.assignment_text || "");
-      
-      // Store ElevenLabs agent ID from backend
-      if (data.elevenlabs_agent_id) {
-        setElevenlabsAgentId(data.elevenlabs_agent_id);
-      }
       
       if (selectedModel === "gemini") {
         setQuestionNumber(data.question_number || 1);
@@ -171,7 +184,6 @@ export default function App() {
     setCurrentQuestion("");
     setCurrentQuestionAudio("");
     setAssignmentText("");
-    setElevenlabsAgentId("");
   }, [speech, audio]);
 
   const isGemini = selectedModel === "gemini";
@@ -180,8 +192,23 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1 className="logo">CETLOE's Learning Integrity Checker</h1>
-        <StepTracker currentStep={step} />
+        <div className="header-right">
+          <StepTracker currentStep={step} />
+          <button 
+            className={`settings-button ${keysConfigured ? 'configured' : ''}`}
+            onClick={() => setShowSettings(true)}
+            title={keysConfigured ? "Settings (API keys configured)" : "Settings (API keys not configured)"}
+          >
+            <SettingsIcon size={20} />
+            {keysConfigured && <span className="settings-badge">✓</span>}
+          </button>
+        </div>
       </header>
+
+      <SettingsModal 
+        isOpen={showSettings} 
+        onClose={() => setShowSettings(false)} 
+      />
 
       <main className="main">
         <div className="container">
@@ -224,7 +251,6 @@ export default function App() {
             <ElevenLabsPanel
               assignmentText={assignmentText}
               fileName={fileName}
-              agentId={elevenlabsAgentId}
               onComplete={handleElevenLabsComplete}
               onRestart={handleRestart}
             />

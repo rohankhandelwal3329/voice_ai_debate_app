@@ -1,5 +1,5 @@
 import uuid
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -37,11 +37,16 @@ class SessionResponse(BaseModel):
     score: Optional[int] = None
     observations: Optional[list] = None
     assignment_text: Optional[str] = None
-    elevenlabs_agent_id: Optional[str] = None
 
 
 @app.post("/api/upload", response_model=SessionResponse)
-async def upload_assignment(file: UploadFile = File(...)):
+async def upload_assignment(
+    file: UploadFile = File(...),
+    gemini_api_key: Optional[str] = Form(None),
+    elevenlabs_api_key: Optional[str] = Form(None),
+    custom_prompt: Optional[str] = Form(None),
+    num_questions: Optional[int] = Form(None),
+):
     """Upload an assignment file and start the interview session."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
@@ -69,32 +74,37 @@ async def upload_assignment(file: UploadFile = File(...)):
             detail="Assignment too short. Need at least 50 words."
         )
 
-    # Start Gemini session
+    # Start Gemini session with custom settings
     try:
-        gemini = GeminiService()
-        response = gemini.start_session(assignment_text)
+        gemini = GeminiService(api_key=gemini_api_key)
+        response = gemini.start_session(
+            assignment_text, 
+            custom_prompt=custom_prompt,
+            num_questions=num_questions or 3
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
 
     session_id = str(uuid.uuid4())
     question_text = response.get("text", "")
 
-    # Generate audio
+    # Generate audio with custom ElevenLabs key if provided
     try:
-        audio_base64 = text_to_speech_base64(question_text)
+        audio_base64 = text_to_speech_base64(question_text, elevenlabs_api_key=elevenlabs_api_key)
     except Exception:
         audio_base64 = ""
 
-    # Store session
+    # Store session with custom settings
     sessions[session_id] = {
         "assignment_text": assignment_text,
         "conversation": [{"role": "ai", "text": question_text}],
         "question_number": 1,
+        "custom_prompt": custom_prompt,
+        "num_questions": num_questions or 3,
+        "gemini_api_key": gemini_api_key,
+        "elevenlabs_api_key": elevenlabs_api_key,
     }
 
-    # Get ElevenLabs agent ID from settings
-    settings = get_settings()
-    
     return SessionResponse(
         session_id=session_id,
         message_type="question",
@@ -102,28 +112,37 @@ async def upload_assignment(file: UploadFile = File(...)):
         audio_base64=audio_base64,
         question_number=1,
         assignment_text=assignment_text[:3000],  # Send first 3000 chars for ElevenLabs context
-        elevenlabs_agent_id=settings.elevenlabs_agent_id or None,
     )
 
 
 @app.post("/api/answer", response_model=SessionResponse)
-async def submit_answer(request: AnswerRequest):
+async def submit_answer(
+    request: AnswerRequest,
+    x_gemini_api_key: Optional[str] = Header(None),
+    x_elevenlabs_api_key: Optional[str] = Header(None),
+):
     """Submit a student answer and get the next question or final review."""
     session = sessions.get(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Use API keys from headers or session
+    gemini_api_key = x_gemini_api_key or session.get("gemini_api_key")
+    elevenlabs_api_key = x_elevenlabs_api_key or session.get("elevenlabs_api_key")
 
     # Add student answer to conversation
     session["conversation"].append({"role": "student", "text": request.answer})
 
     # Get next response from Gemini
     try:
-        gemini = GeminiService()
+        gemini = GeminiService(api_key=gemini_api_key)
         response = gemini.process_answer(
             assignment_text=session["assignment_text"],
             conversation_history=session["conversation"],
             answer=request.answer,
             question_number=session["question_number"],
+            custom_prompt=session.get("custom_prompt"),
+            num_questions=session.get("num_questions", 3),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
@@ -131,9 +150,9 @@ async def submit_answer(request: AnswerRequest):
     response_type = response.get("type", "question")
     response_text = response.get("text") or response.get("review", "")
 
-    # Generate audio
+    # Generate audio with custom ElevenLabs key if provided
     try:
-        audio_base64 = text_to_speech_base64(response_text)
+        audio_base64 = text_to_speech_base64(response_text, elevenlabs_api_key=elevenlabs_api_key)
     except Exception:
         audio_base64 = ""
 

@@ -4,33 +4,72 @@ A voice-powered tool that verifies whether students truly understand the assignm
 
 ## Features
 
-- **Dual AI Models**: Choose between Gemini AI or ElevenLabs Conversational AI
+- **Voice Q&A**: AI asks questions about your assignment, you answer with your voice
 - **File Upload**: Supports PDF, DOCX, PPTX, and TXT (up to 8 MB)
-- **Voice Conversation**: Real-time speech recognition and natural AI voice responses
 - **Live Transcript**: See the conversation as it happens
 - **Integrity Scoring**: Precise scores (30-100) based on how well students explain their work
 - **Modern UI**: Clean, minimal design with interactive audio-reactive orb
+- **In-Browser Settings**: Configure API keys through the UI (stored securely in browser)
 - **High-Quality TTS**: Optional ElevenLabs text-to-speech for natural voice output
+- **Docker Support**: Easy deployment with Docker Compose
 
-## AI Model Options
+---
 
-### Gemini AI (Default)
-- Custom implementation using Google's Gemini 2.5 Flash API
-- Backend handles conversation logic and scoring
-- Uses Web Speech API for voice input
-- ElevenLabs TTS for natural voice output (or gTTS fallback)
-- Audio-reactive orb visualization
+## 🐳 Quick Start with Docker (Recommended)
 
-### ElevenLabs Conversational AI
-- Uses ElevenLabs' conversational AI agent
-- Real-time voice-to-voice conversation
-- Live transcription from ElevenLabs
-- Custom audio-reactive orb visualization
-- Requires ElevenLabs agent setup (see below)
+The easiest way to run the app:
 
-## Setup
+### Prerequisites
 
-### 1. Backend (Python)
+**Don't have Docker?** See [DOCKER_SETUP.md](DOCKER_SETUP.md) for installation instructions.
+
+### Verify Docker Setup
+
+Before running, test your Docker installation:
+
+```bash
+# Windows PowerShell
+.\test-docker.ps1
+
+# Mac/Linux
+chmod +x test-docker.sh
+./test-docker.sh
+```
+
+### Run the Application
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd voice_assignment
+
+# Build and run with Docker Compose
+docker-compose up --build
+```
+
+Open http://localhost:3000 in Chrome and configure your API keys in Settings.
+
+### Docker Commands
+
+```bash
+# Start in background
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop containers
+docker-compose down
+
+# Development mode with hot reload
+docker-compose --profile dev up
+```
+
+---
+
+## 💻 Manual Installation
+
+### 1. Install Backend
 
 ```bash
 cd backend
@@ -42,98 +81,62 @@ venv\Scripts\activate  # Windows
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Configure environment
-copy env.example .env  # Windows
-# cp env.example .env  # Mac/Linux
-
-# Edit .env and add your API keys
-notepad .env
 ```
 
-### 2. Environment Variables
-
-Create a `.env` file in the `backend/` folder with:
-
-```env
-# Required: Google Gemini API key for Q&A
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Optional: ElevenLabs API key for high-quality TTS (Gemini voice)
-# Get your free API key at: https://elevenlabs.io
-# Free tier: 10,000 characters/month
-ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
-
-# Required for ElevenLabs model: Conversational AI Agent ID
-# Create an agent at: https://elevenlabs.io/app/conversational-ai
-ELEVENLABS_AGENT_ID=your_agent_id_here
-```
-
-**Get API Keys:**
-- Gemini: https://aistudio.google.com/app/apikey
-- ElevenLabs: https://elevenlabs.io (free tier available)
-
-### 3. Frontend (React)
+### 2. Install Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
 ```
 
-### 4. ElevenLabs Agent Setup (For ElevenLabs Model)
-
-If you want to use the ElevenLabs conversational AI model:
-
-1. Create an account at https://elevenlabs.io
-2. Go to **Conversational AI** → **Agents** → Create new agent
-3. Copy the **Agent ID** and add it to your `.env` file as `ELEVENLABS_AGENT_ID`
-4. In agent settings → **Security** tab:
-   - Enable **First message** override
-   - Enable **System prompt** override
-5. In agent settings → **Advanced** tab:
-   - Enable **User transcripts** for live transcription
-6. Set a default system prompt (will be overridden by the app):
-   ```
-   You are an AI coach verifying a student understands their submitted assignment.
-   Ask 3 short, specific questions about their work, then give an integrity score.
-   ```
-
-## Running Locally
-
-### Option 1: Using run.py (Recommended)
+### 3. Run the App
 
 ```bash
+# From the project root
 python run.py
 ```
 
-This starts both backend and frontend automatically.
+This starts both backend and frontend. Open http://localhost:5173 in Chrome.
 
-### Option 2: Manual Start
+---
 
-**Terminal 1 - Backend:**
-```bash
-cd backend
-venv\Scripts\activate  # Windows
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+## 🔑 Configure API Keys (First-Time Setup)
 
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
-npm run dev
-```
+When you first open the app, a settings dialog will appear:
 
-Open http://localhost:5173 in Chrome (best speech recognition support).
+1. **Get a Gemini API Key** (required):
+   - Go to https://aistudio.google.com/app/apikey
+   - Create a new API key
+   - Paste it in the Settings dialog
+
+2. **Get an ElevenLabs API Key** (optional, for better voice):
+   - Go to https://elevenlabs.io
+   - Create a free account (10,000 characters/month free)
+   - Copy your API key from the dashboard
+
+Your keys are stored securely in your browser's local storage — **you only need to enter them once**.
+
+---
 
 ## Usage Flow
 
 1. **Upload**: Drag or select a PDF/DOCX/PPTX/TXT file
-2. **Select Model**: Choose Gemini AI or ElevenLabs
-3. **Start Q&A**: Click "Start Q&A" to begin the voice conversation
-4. **Answer Questions**: The AI asks 3 questions about your assignment
-5. **Get Results**: See your integrity score (30-100) and review
+2. **Start Q&A**: Click "Start Q&A" to begin the voice conversation
+3. **Answer Questions**: The AI asks 3 questions about your assignment
+4. **Get Results**: See your integrity score (30-100) and review
+
+## Settings
+
+Click the ⚙️ icon in the top right to access settings:
+
+- **API Keys**: Configure your Gemini and ElevenLabs API keys
+- **AI Prompt**: Customize the AI's behavior and scoring criteria
+- **Number of Questions**: Choose 2-5 questions per session
+
+Settings persist across browser sessions.
+
+---
 
 ## Project Structure
 
@@ -145,58 +148,63 @@ Open http://localhost:5173 in Chrome (best speech recognition support).
 │   ├── gemini_service.py    # Gemini AI integration
 │   ├── tts_service.py       # Text-to-speech (ElevenLabs/gTTS)
 │   ├── requirements.txt     # Python dependencies
-│   └── env.example          # Environment template
+│   └── Dockerfile           # Backend container
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx          # Main React app
 │   │   ├── styles.css       # Styling
 │   │   ├── api.js           # API client
-│   │   ├── components/
-│   │   │   ├── UploadPanel.jsx      # File upload + model selection
-│   │   │   ├── ReadyPanel.jsx       # Pre-conversation screen
-│   │   │   ├── GeminiPanel.jsx      # Gemini Q&A interface
-│   │   │   ├── ElevenLabsPanel.jsx  # ElevenLabs Q&A interface
-│   │   │   ├── ResultsPanel.jsx     # Score display
-│   │   │   ├── Orb.jsx              # Audio-reactive orb component
-│   │   │   ├── StepTracker.jsx      # Progress indicator
-│   │   │   └── Icons.jsx            # SVG icons
-│   │   └── hooks/
-│   │       ├── useSpeechRecognition.js  # Voice input hook
-│   │       └── useAudioPlayer.js        # Audio playback hook
+│   │   ├── components/      # React components
+│   │   └── hooks/           # Custom React hooks
 │   ├── package.json         # Node dependencies
-│   └── vite.config.js       # Vite configuration
+│   ├── Dockerfile           # Frontend container
+│   └── nginx.conf           # Production web server config
 │
-└── run.py                   # Start both servers
+├── docker-compose.yml       # Container orchestration
+└── run.py                   # Local development runner
 ```
 
-## Browser Support
-
-- **Chrome**: Full support (Web Speech API + ElevenLabs)
-- **Edge**: Full support
-- **Firefox**: ElevenLabs only (no Web Speech API)
-- **Safari**: Partial support
+---
 
 ## Troubleshooting
 
-### ElevenLabs not connecting
-- Ensure `ELEVENLABS_AGENT_ID` is set in your `.env` file
-- Check that overrides are enabled in agent Security settings
+### "API key required" error
+- Open Settings (⚙️ icon) and add your Gemini API key
+- Get one free at https://aistudio.google.com/app/apikey
 
 ### Speech recognition stops working
 - Refresh the page
 - Check microphone permissions
 - Use Chrome for best support
 
-### Changing the Gemini TTS Voice
+### Voice sounds robotic
+- Add an ElevenLabs API key in Settings for natural voice
+- Without it, the app uses gTTS (robotic sounding)
+
+### Docker issues
+```bash
+# Rebuild containers from scratch
+docker-compose down
+docker-compose build --no-cache
+docker-compose up
+```
+
+### Changing the Voice
 
 Edit `backend/tts_service.py` to change the ElevenLabs voice:
 
 ```python
-# Some voice options:
+# Voice options:
 # - "EXAVITQu4vr4xnSDxMaL" - Bella (friendly female) - default
 # - "21m00Tcm4TlvDq8ikWAM" - Rachel (calm female)
 # - "ErXwobaYiN019PkySvjV" - Antoni (friendly male)
 # - "pNInz6obpgDQGcFmaJgB" - Adam (professional male)
 ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
 ```
+
+---
+
+## License
+
+MIT
